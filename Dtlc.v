@@ -2,74 +2,92 @@ Require Import List.
 Require Import Nat.
 Import ListNotations.
 
-Notation varid := nat.
-
+(* Syntax *)
 Inductive term : Type :=
-  | Var : varid -> term
+  | Var : nat -> term
   | Star : term
-  | Pi : varid -> term -> term -> term
-  | Fun : varid -> term -> term -> term
+  | Pi : term -> term -> term
+  | Fun : term -> term -> term
   | App : term -> term -> term
   | Nat : term
   | Zero : term
   | Succ : term -> term
   | ElimNat : term -> term -> term -> term -> term.
 
-Definition context := list term.
-
-(* Context Lookup *)
-Fixpoint lookup (x : varid) (ctx : context) : option term :=
-  match x, ctx with
-  | O, hd :: _ => Some hd
-  | S x', _ :: tl => lookup x' tl
-  | _, _ => None
-  end.
-
-Fixpoint inb (x : varid) (l : list varid) : bool :=
-  match l with
-  | [] => false
-  | hd :: tl => if hd =? x then true else inb x tl
-  end.
-
-Fixpoint union (l1 l2 : list varid) : list varid :=
-  match l1 with
-  | [] => l2
-  | hd :: tl => if inb hd l2 then union tl l2 else hd :: union tl l2
-  end.
-
-Fixpoint diff (l1 l2 : list varid) : list varid :=
-  match l1 with
-  | [] => []
-  | hd :: tl => if inb hd l2 then diff tl l2 else hd :: diff tl l2
-  end.
-
-(* Free Variables *)
-Fixpoint fv (t : term) : list varid :=
+(* De Bruijn Lifting *)
+Fixpoint lift (n : nat) (k : nat) (t : term) : term :=
   match t with
-  | Var x => [x]
-  | Star => []
-  | Pi x ty1 ty2 => union (fv ty1) (diff (fv ty2) [x])
-  | Fun x ty t' => union (fv ty) (diff (fv t') [x])
-  | App t1 t2 => union (fv t1) (fv t2)
-  | Nat => []
-  | Zero => []
-  | Succ t' => fv t'
-  | ElimNat t t0 tsuc t' => union (union (union (fv t) (fv t0)) (fv tsuc)) (fv t')
-  end.
-
-(* Capture-Avoiding Substitution *)
-Fixpoint subst (x : varid) (repl : term) (t : term) : term :=
-  if negb (inb x (fv t)) then t else
-  match t with
-  | Var y => if x =? y then repl else t
+  | Var x => if x <? k then Var x else Var (x + n)
   | Star => Star
-  | Pi y ty1 ty2 => if inb y (union [x] (fv repl)) then t else
-    Pi y (subst x repl ty1) (subst x repl ty2)
-  | Fun y ty t' => if inb y (union [x] (fv repl)) then t else
-    Fun y (subst x repl ty) (subst x repl t')
-  | App t1 t2 => App (subst x repl t1) (subst x repl t2)
+  | Pi ty t' => Pi (lift n k ty) (lift n (S k) t')
+  | Fun ty t' => Fun (lift n k ty) (lift n (S k) t')
+  | App t1 t2 => App (lift n k t1) (lift n k t2)
   | Nat => Nat
   | Zero => Zero
-  | Succ t' => Succ (subst x repl t')
-  | ElimNat t t0 tsuc t' => ElimNat (subst x repl t) (subst x repl t0) (subst x repl tsuc) (subst x repl t')
+  | Succ t' => Succ (lift n k t')
+  | ElimNat t t0 tsuc t' => ElimNat (lift n k t) (lift n k t0) (lift n k tsuc) (lift n k t')
   end.
+
+(* De Bruijn Substitution *)
+Fixpoint subst (n : nat) (repl : term) (t : term) : term :=
+  match t with
+  | Var x => if x =? n then repl else if x <? n then Var x else Var (x - 1)
+  | Star => Star
+  | Pi ty t' => Pi (subst n repl ty) (subst (S n) (lift 1 0 repl) t')
+  | Fun ty t' => Fun (subst n repl ty) (subst (S n) (lift 1 0 repl) t')
+  | App t1 t2 => App (subst n repl t1) (subst n repl t2)
+  | Nat => Nat
+  | Zero => Zero
+  | Succ t' => Succ (subst n repl t')
+  | ElimNat t t0 tsuc t' => ElimNat (subst n repl t) (subst n repl t0) (subst n repl tsuc) (subst n repl t')
+  end.
+
+(* Evaluation *)
+Fixpoint eval (t : term) : term :=
+  match t with
+  | Var n => Var n
+  | Star => Star
+  | Pi ty t' => Pi (eval ty) (eval t')
+  | Fun ty t' => Fun (eval ty) (eval t')
+  | App t1 t2 =>
+      let t1' := eval t1 in
+      let t2' := eval t2 in
+      match t1' with
+      | Fun _ t' => subst 0 t2' t'
+      | _ => App t1' t2'
+      end
+  | Nat => Nat
+  | Zero => Zero
+  | Succ t' => Succ (eval t')
+  | ElimNat t t0 tsuc t' =>
+      let t'' := eval t' in
+      match t'' with
+      | Zero => eval t0
+      | Succ n => App (App tsuc n) (ElimNat t t0 tsuc n)
+      | _ => ElimNat (eval t) (eval t0) (eval tsuc) t''
+      end
+  end.
+
+Definition t1 := Fun Nat (App (App (Var 1) (Fun Nat (Var 3))) (Var 2)).
+
+(* fun.((1 (fun.3)) 2)[1 <- 0] = fun.((1 (fun.2)) 1) *)
+Example subst1 :
+  subst 1 (Var 0) t1 = Fun Nat (App (App (Var 1) (Fun Nat (Var 2))) (Var 1)).
+
+Proof. simpl. reflexivity. Qed.
+
+Definition t2 := Fun Nat (Fun Nat (Var 1)).
+
+(* ((fun.fun.1) succ succ zero) zero = succ succ zero *)
+Example eval1 :
+  eval (App (App t2 (Succ (Succ Zero))) Zero) = Succ (Succ Zero).
+
+Proof. simpl. reflexivity. Qed.
+
+Definition t3 := Fun Nat (App (Var 0) (Var 0)).
+
+(* (fun.0 0) (fun.0 0) = (fun.0 0) (fun.0 0) *)
+Example eval2 :
+  eval (App t3 t3) = (App t3 t3).
+
+Proof. simpl. reflexivity. Qed.
