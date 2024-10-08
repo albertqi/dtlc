@@ -30,6 +30,25 @@ Fixpoint term_beq (t1 t2 : term) : bool :=
   | _, _ => false
   end.
 
+(* Convert Nat to Term *)
+Fixpoint nat_to_term (n : nat) : term :=
+  match n with
+  | O => Zero
+  | S n' => Succ (nat_to_term n')
+  end.
+
+(* Convert Term to Nat *)
+Fixpoint term_to_nat (t : term) : option nat :=
+  match t with
+  | Zero => Some O
+  | Succ t' =>
+      match term_to_nat t' with
+      | Some n => Some (S n)
+      | None => None
+      end
+  | _ => None
+  end.
+
 (* De Bruijn Lifting *)
 Fixpoint lift (n : nat) (k : nat) (t : term) : term :=
   match t with
@@ -84,6 +103,13 @@ Fixpoint eval (t : term) : term :=
       end
   end.
 
+(* Evaluation with Fuel *)
+Fixpoint eval_fuel (fuel : nat) (t : term) : term :=
+  match fuel with
+  | O => t
+  | S fuel' => eval_fuel fuel' (eval t)
+  end.
+
 (* Typing Relation *)
 Fixpoint get_type (ctx : list term) (t : term) : option term :=
   match t with
@@ -117,14 +143,10 @@ Fixpoint get_type (ctx : list term) (t : term) : option term :=
       | _ => None
       end
   | ElimNat t t0 tsuc t' =>
+      let ty := eval (App t Zero) in
       match get_type ctx t, get_type ctx t0, get_type ctx tsuc, get_type ctx t' with
-      | Some (Fun Nat Star), Some (App t'' Zero), Some (Fun Nat (Fun t1 t2)), Some Nat =>
-          if negb (term_beq t'' t) then None else
-          match t1, t2 with
-          | App t1' (Var n1), App t2' (Succ (Var n2)) =>
-              if andb (term_beq t1' t2') (n1 =? n2) then Some (App t t') else None
-          | _, _ => None
-          end
+      | Some (Pi Nat Star), Some ty1, Some (Pi Nat (Pi ty2 ty3)), Some Nat =>
+          if andb (andb (term_beq ty ty1) (term_beq ty ty2)) (term_beq ty ty3) then Some ty else None
       | _, _, _, _ => None
       end
   end.
@@ -159,4 +181,42 @@ Definition t4 := Fun Star (Fun (Var 0) (Var 0)).
 Example get_type1 :
   get_type [] t4 = Some (Pi Star (Pi (Var 0) (Var 0))).
   
+Proof. simpl. reflexivity. Qed.
+
+(* Plus Function *)
+Definition plus : term :=
+  Fun Nat (Fun Nat (ElimNat (Fun Nat Nat) (Var 1) (Fun Nat (Fun Nat (Succ (Var 0)))) (Var 0))).
+
+Example plus1 :
+  eval_fuel 10 (App (App plus (nat_to_term 3)) Zero) = nat_to_term 3.
+
+Proof. simpl. reflexivity. Qed.
+
+Example plus2 :
+  eval_fuel 100 (App (App plus (nat_to_term 37)) (nat_to_term 43)) = nat_to_term 80.
+
+Proof. reflexivity. Qed.
+
+Example plus3 :
+  get_type [] plus = Some (Pi Nat (Pi Nat Nat)).
+
+Proof. simpl. reflexivity. Qed.
+
+(* Multiplication Function *)
+Definition mult : term :=
+  Fun Nat (Fun Nat (ElimNat (Fun Nat Nat) Zero (Fun Nat (Fun Nat (App (App plus (Var 0)) (Var 3)))) (Var 0))).
+
+Example mult1 :
+  eval_fuel 10 (App (App mult (nat_to_term 3)) Zero) = Zero.
+
+Proof. simpl. reflexivity. Qed.
+
+Example mult2 :
+  eval_fuel 200 (App (App mult (nat_to_term 17)) (nat_to_term 11)) = nat_to_term 187.
+
+Proof. reflexivity. Qed.
+
+Example mult3 :
+  get_type [] mult = Some (Pi Nat (Pi Nat Nat)).
+
 Proof. simpl. reflexivity. Qed.
