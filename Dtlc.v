@@ -220,3 +220,27 @@ Example mult3 :
   get_type [] mult = Some (Pi Nat (Pi Nat Nat)).
 
 Proof. simpl. reflexivity. Qed.
+
+(* Commutative Property *)
+Example comm1 :
+  eval_fuel 200 (App (App plus (nat_to_term 29)) (nat_to_term 163)) = eval_fuel 200 (App (App plus (nat_to_term 163)) (nat_to_term 29)).
+
+Proof. reflexivity. Qed.
+
+Example comm2 :
+  eval_fuel 200 (App (App mult (nat_to_term 7)) (nat_to_term 23)) = eval_fuel 200 (App (App mult (nat_to_term 23)) (nat_to_term 7)).
+
+Proof. reflexivity. Qed.
+
+(* Associative Property *)
+Example assoc1 :
+  eval_fuel 200 (App (App plus (App (App plus (nat_to_term 24)) (nat_to_term 98))) (nat_to_term 47)) =
+  eval_fuel 200 (App (App plus (nat_to_term 24)) (App (App plus (nat_to_term 98)) (nat_to_term 47))).
+
+Proof. reflexivity. Qed.
+
+Example assoc2 :
+  eval_fuel 200 (App (App mult (App (App mult (nat_to_term 4)) (nat_to_term 5))) (nat_to_term 6)) =
+  eval_fuel 200 (App (App mult (nat_to_term 4)) (App (App mult (nat_to_term 5)) (nat_to_term 6))).
+
+Proof. reflexivity. Qed.
