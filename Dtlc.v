@@ -2,6 +2,8 @@ Require Import List.
 Require Import Nat.
 Import ListNotations.
 
+(******************************** DEFINITIONS ********************************)
+
 (*** Syntax ***)
 Inductive term : Type :=
   | Var : nat -> term
@@ -184,8 +186,20 @@ Proof. simpl. reflexivity. Qed.
 
 Definition id := Fun Star (Fun (Var 0) (Var 0)).
 
-(* id : (A : Star) -> A -> A *)
+(* 100 = 100 *)
 Example id1 :
+  eval (App (App id Nat) (nat_to_term 100)) = nat_to_term 100.
+
+Proof. simpl. reflexivity. Qed.
+
+(* Fun.Succ 0 = Fun.Succ 0 *)
+Example id2 :
+  eval (App (App id (Pi Nat Nat)) (Fun Nat (Succ (Var 0)))) = Fun Nat (Succ (Var 0)).
+
+Proof. simpl. reflexivity. Qed.
+
+(* id : (A : Star) -> A -> A *)
+Example id3 :
   get_type [] id = Some (Pi Star (Pi (Var 0) (Var 0))).
   
 Proof. simpl. reflexivity. Qed.
