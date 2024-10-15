@@ -274,6 +274,29 @@ Example pow5 :
 
 Proof. reflexivity. Qed.
 
+Example pow6 :
+  eval_fuel 200 (App (App mult (App (App pow (nat_to_term 2)) (nat_to_term 3))) (App (App pow (nat_to_term 2)) (nat_to_term 4))) =
+  eval_fuel 200 (App (App pow (nat_to_term 2)) (App (App plus (nat_to_term 3)) (nat_to_term 4))).
+
+Proof. reflexivity. Qed.
+
+Example pow7 :
+  eval_fuel 200 (App (App pow (App (App pow (nat_to_term 2)) (nat_to_term 3))) (nat_to_term 2)) =
+  eval_fuel 200 (App (App pow (nat_to_term 2)) (App (App mult (nat_to_term 3)) (nat_to_term 2))).
+
+Proof. reflexivity. Qed.
+
+Example pow8 :
+  eval_fuel 200 (App (App pow (App (App mult (nat_to_term 3)) (nat_to_term 4))) (nat_to_term 2)) =
+  eval_fuel 200 (App (App mult (App (App pow (nat_to_term 3)) (nat_to_term 2))) (App (App pow (nat_to_term 4)) (nat_to_term 2))).
+
+Proof. reflexivity. Qed.
+
+Example pow9 :
+  get_type [] pow = Some (Pi Nat (Pi Nat Nat)).
+
+Proof. simpl. reflexivity. Qed.
+
 (* Factorial Function *)
 Definition fact : term :=
   Fun Nat (ElimNat (Fun Nat Nat) (Succ Zero) (Fun Nat (Fun Nat (App (App mult (Succ (Var 1))) (Var 0)))) (Var 0)).
@@ -287,3 +310,8 @@ Example fact2 :
   eval_fuel 200 (App fact (nat_to_term 5)) = nat_to_term 120.
 
 Proof. reflexivity. Qed.
+
+Example fact3 :
+  get_type [] fact = Some (Pi Nat Nat).
+
+Proof. simpl. reflexivity. Qed.
