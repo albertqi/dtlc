@@ -2,7 +2,7 @@ Require Import List.
 Require Import Nat.
 Import ListNotations.
 
-(* Syntax *)
+(*** Syntax ***)
 Inductive term : Type :=
   | Var : nat -> term
   | Star : term
@@ -14,7 +14,7 @@ Inductive term : Type :=
   | Succ : term -> term
   | ElimNat : term -> term -> term -> term -> term.
 
-(* Term Equality *)
+(*** Term Equality ***)
 Fixpoint term_beq (t1 t2 : term) : bool :=
   match t1, t2 with
   | Var n1, Var n2 => n1 =? n2
@@ -30,14 +30,14 @@ Fixpoint term_beq (t1 t2 : term) : bool :=
   | _, _ => false
   end.
 
-(* Convert Nat to Term *)
+(*** Convert Nat to Term ***)
 Fixpoint nat_to_term (n : nat) : term :=
   match n with
   | O => Zero
   | S n' => Succ (nat_to_term n')
   end.
 
-(* Convert Term to Nat *)
+(*** Convert Term to Nat ***)
 Fixpoint term_to_nat (t : term) : option nat :=
   match t with
   | Zero => Some O
@@ -49,7 +49,7 @@ Fixpoint term_to_nat (t : term) : option nat :=
   | _ => None
   end.
 
-(* De Bruijn Lifting *)
+(*** De Bruijn Lifting ***)
 Fixpoint lift (n : nat) (k : nat) (t : term) : term :=
   match t with
   | Var x => if x <? k then Var x else Var (x + n)
@@ -63,7 +63,7 @@ Fixpoint lift (n : nat) (k : nat) (t : term) : term :=
   | ElimNat t t0 tsuc t' => ElimNat (lift n k t) (lift n k t0) (lift n k tsuc) (lift n k t')
   end.
 
-(* De Bruijn Substitution *)
+(*** De Bruijn Substitution ***)
 Fixpoint subst (n : nat) (repl : term) (t : term) : term :=
   match t with
   | Var x => if x =? n then repl else if x <? n then Var x else Var (x - 1)
@@ -77,7 +77,7 @@ Fixpoint subst (n : nat) (repl : term) (t : term) : term :=
   | ElimNat t t0 tsuc t' => ElimNat (subst n repl t) (subst n repl t0) (subst n repl tsuc) (subst n repl t')
   end.
 
-(* Evaluation *)
+(*** Evaluation ***)
 Fixpoint eval (t : term) : term :=
   match t with
   | Var n => Var n
@@ -103,14 +103,14 @@ Fixpoint eval (t : term) : term :=
       end
   end.
 
-(* Evaluation with Fuel *)
+(*** Evaluation with Fuel ***)
 Fixpoint eval_fuel (fuel : nat) (t : term) : term :=
   match fuel with
   | O => t
   | S fuel' => eval_fuel fuel' (eval t)
   end.
 
-(* Typing Relation *)
+(*** Typing Relation ***)
 Fixpoint get_type (ctx : list term) (t : term) : option term :=
   match t with
   | Var n => nth_error ctx n
@@ -151,166 +151,203 @@ Fixpoint get_type (ctx : list term) (t : term) : option term :=
       end
   end.
 
-Definition t1 := Fun Nat (App (App (Var 1) (Fun Nat (Var 3))) (Var 2)).
+(********************************** EXAMPLES **********************************)
 
-(* fun.((1 (fun.3)) 2)[1 <- 0] = fun.((1 (fun.2)) 1) *)
+(*** Substitution ***)
+
+(* Fun.((1 (Fun.3)) 2)[1 <- 0] = Fun.((1 (Fun.2)) 1) *)
 Example subst1 :
-  subst 1 (Var 0) t1 = Fun Nat (App (App (Var 1) (Fun Nat (Var 2))) (Var 1)).
+  subst 1 (Var 0) (Fun Nat (App (App (Var 1) (Fun Nat (Var 3))) (Var 2))) =
+  Fun Nat (App (App (Var 1) (Fun Nat (Var 2))) (Var 1)).
 
 Proof. simpl. reflexivity. Qed.
 
-Definition t2 := Fun Nat (Fun Nat (Var 1)).
+(*** Evaluation ***)
 
-(* ((fun.fun.1) succ succ zero) zero = succ succ zero *)
+(* ((Fun.Fun.1) Succ Succ Zero) Zero = Succ Succ Zero *)
 Example eval1 :
-  eval (App (App t2 (Succ (Succ Zero))) Zero) = Succ (Succ Zero).
+  eval (App (App (Fun Nat (Fun Nat (Var 1))) (Succ (Succ Zero))) Zero) = Succ (Succ Zero).
 
 Proof. simpl. reflexivity. Qed.
 
-Definition t3 := Fun Nat (App (Var 0) (Var 0)).
+(*** Omega Combinator ***)
 
-(* (fun.0 0) (fun.0 0) = (fun.0 0) (fun.0 0) *)
-Example eval2 :
-  eval (App t3 t3) = (App t3 t3).
+Definition omega := App (Fun Nat (App (Var 0) (Var 0))) (Fun Nat (App (Var 0) (Var 0))).
+
+(* (Fun.0 0) (Fun.0 0) = (Fun.0 0) (Fun.0 0) *)
+Example omega1 :
+  eval omega = omega.
 
 Proof. simpl. reflexivity. Qed.
 
-(* Polymorphic Identity Function *)
-Definition t4 := Fun Star (Fun (Var 0) (Var 0)).
+(*** Polymorphic Identity Function ***)
 
-Example get_type1 :
-  get_type [] t4 = Some (Pi Star (Pi (Var 0) (Var 0))).
+Definition id := Fun Star (Fun (Var 0) (Var 0)).
+
+(* id : (A : Star) -> A -> A *)
+Example id1 :
+  get_type [] id = Some (Pi Star (Pi (Var 0) (Var 0))).
   
 Proof. simpl. reflexivity. Qed.
 
-(* Plus Function *)
+(*** Plus Function ***)
+
 Definition plus : term :=
   Fun Nat (Fun Nat (ElimNat (Fun Nat Nat) (Var 1) (Fun Nat (Fun Nat (Succ (Var 0)))) (Var 0))).
 
+(* 3 + 0 = 3 *)
 Example plus1 :
   eval_fuel 10 (App (App plus (nat_to_term 3)) Zero) = nat_to_term 3.
 
 Proof. simpl. reflexivity. Qed.
 
+(* 37 + 43 = 80 *)
 Example plus2 :
   eval_fuel 100 (App (App plus (nat_to_term 37)) (nat_to_term 43)) = nat_to_term 80.
 
 Proof. reflexivity. Qed.
 
+(* plus : Nat -> Nat -> Nat *)
 Example plus3 :
   get_type [] plus = Some (Pi Nat (Pi Nat Nat)).
 
 Proof. simpl. reflexivity. Qed.
 
-(* Multiplication Function *)
+(*** Multiplication Function ***)
+
 Definition mult : term :=
   Fun Nat (Fun Nat (ElimNat (Fun Nat Nat) Zero (Fun Nat (Fun Nat (App (App plus (Var 0)) (Var 3)))) (Var 0))).
 
+(* 3 * 0 = 0 *)
 Example mult1 :
   eval_fuel 10 (App (App mult (nat_to_term 3)) Zero) = Zero.
 
 Proof. simpl. reflexivity. Qed.
 
+(* 17 * 11 = 187 *)
 Example mult2 :
   eval_fuel 200 (App (App mult (nat_to_term 17)) (nat_to_term 11)) = nat_to_term 187.
 
 Proof. reflexivity. Qed.
 
+(* mult : Nat -> Nat -> Nat *)
 Example mult3 :
   get_type [] mult = Some (Pi Nat (Pi Nat Nat)).
 
 Proof. simpl. reflexivity. Qed.
 
-(* Commutative Property *)
+(*** Commutative Property ***)
+
+(* 29 + 163 = 163 + 29 *)
 Example comm1 :
-  eval_fuel 200 (App (App plus (nat_to_term 29)) (nat_to_term 163)) = eval_fuel 200 (App (App plus (nat_to_term 163)) (nat_to_term 29)).
+  eval_fuel 200 (App (App plus (nat_to_term 29)) (nat_to_term 163)) =
+  eval_fuel 200 (App (App plus (nat_to_term 163)) (nat_to_term 29)).
 
 Proof. reflexivity. Qed.
 
+(* 7 * 23 = 23 * 7 *)
 Example comm2 :
-  eval_fuel 200 (App (App mult (nat_to_term 7)) (nat_to_term 23)) = eval_fuel 200 (App (App mult (nat_to_term 23)) (nat_to_term 7)).
+  eval_fuel 200 (App (App mult (nat_to_term 7)) (nat_to_term 23)) =
+  eval_fuel 200 (App (App mult (nat_to_term 23)) (nat_to_term 7)).
 
 Proof. reflexivity. Qed.
 
-(* Associative Property *)
+(*** Associative Property ***)
+
+(* (24 + 98) + 47 = 24 + (98 + 47) *)
 Example assoc1 :
   eval_fuel 200 (App (App plus (App (App plus (nat_to_term 24)) (nat_to_term 98))) (nat_to_term 47)) =
   eval_fuel 200 (App (App plus (nat_to_term 24)) (App (App plus (nat_to_term 98)) (nat_to_term 47))).
 
 Proof. reflexivity. Qed.
 
+(* (4 * 5) * 6 = 4 * (5 * 6) *)
 Example assoc2 :
   eval_fuel 200 (App (App mult (App (App mult (nat_to_term 4)) (nat_to_term 5))) (nat_to_term 6)) =
   eval_fuel 200 (App (App mult (nat_to_term 4)) (App (App mult (nat_to_term 5)) (nat_to_term 6))).
 
 Proof. reflexivity. Qed.
 
-(* Power Function *)
+(*** Power Function ***)
+
 Definition pow : term :=
   Fun Nat (Fun Nat (ElimNat (Fun Nat Nat) (Succ Zero) (Fun Nat (Fun Nat (App (App mult (Var 3)) (Var 0)))) (Var 0))).
 
+(* 5 ^ 0 = 1 *)
 Example pow1 :
   eval_fuel 10 (App (App pow (nat_to_term 5)) Zero) = Succ Zero.
 
 Proof. simpl. reflexivity. Qed.
 
+(* 0 ^ 5 = 0 *)
 Example pow2 :
   eval_fuel 10 (App (App pow Zero) (nat_to_term 5)) = Zero.
 
 Proof. simpl. reflexivity. Qed.
 
+(* 0 ^ 0 = 1 *)
 Example pow3 :
   eval_fuel 10 (App (App pow Zero) Zero) = Succ Zero.
 
 Proof. simpl. reflexivity. Qed.
 
+(* 5 ^ 2 = 25 *)
 Example pow4 :
   eval_fuel 100 (App (App pow (nat_to_term 5)) (nat_to_term 2)) = nat_to_term 25.
 
 Proof. reflexivity. Qed.
 
+(* 2 ^ 5 = 32 *)
 Example pow5 :
   eval_fuel 100 (App (App pow (nat_to_term 2)) (nat_to_term 5)) = nat_to_term 32.
 
 Proof. reflexivity. Qed.
 
+(* (2 ^ 3) * (2 ^ 4) = 2 ^ (3 + 4) *)
 Example pow6 :
   eval_fuel 200 (App (App mult (App (App pow (nat_to_term 2)) (nat_to_term 3))) (App (App pow (nat_to_term 2)) (nat_to_term 4))) =
   eval_fuel 200 (App (App pow (nat_to_term 2)) (App (App plus (nat_to_term 3)) (nat_to_term 4))).
 
 Proof. reflexivity. Qed.
 
+(* (2 ^ 3) ^ 2 = 2 ^ (3 * 2) *)
 Example pow7 :
   eval_fuel 200 (App (App pow (App (App pow (nat_to_term 2)) (nat_to_term 3))) (nat_to_term 2)) =
   eval_fuel 200 (App (App pow (nat_to_term 2)) (App (App mult (nat_to_term 3)) (nat_to_term 2))).
 
 Proof. reflexivity. Qed.
 
+(* (3 * 4) ^ 2 = (3 ^ 2) * (4 ^ 2) *)
 Example pow8 :
   eval_fuel 200 (App (App pow (App (App mult (nat_to_term 3)) (nat_to_term 4))) (nat_to_term 2)) =
   eval_fuel 200 (App (App mult (App (App pow (nat_to_term 3)) (nat_to_term 2))) (App (App pow (nat_to_term 4)) (nat_to_term 2))).
 
 Proof. reflexivity. Qed.
 
+(* pow : Nat -> Nat -> Nat *)
 Example pow9 :
   get_type [] pow = Some (Pi Nat (Pi Nat Nat)).
 
 Proof. simpl. reflexivity. Qed.
 
-(* Factorial Function *)
+(*** Factorial Function ***)
+
 Definition fact : term :=
   Fun Nat (ElimNat (Fun Nat Nat) (Succ Zero) (Fun Nat (Fun Nat (App (App mult (Succ (Var 1))) (Var 0)))) (Var 0)).
 
+(* 0! = 1 *)
 Example fact1 :
   eval_fuel 10 (App fact Zero) = Succ Zero.
 
 Proof. simpl. reflexivity. Qed.
 
+(* 5! = 120 *)
 Example fact2 :
   eval_fuel 200 (App fact (nat_to_term 5)) = nat_to_term 120.
 
 Proof. reflexivity. Qed.
 
+(* fact : Nat -> Nat *)
 Example fact3 :
   get_type [] fact = Some (Pi Nat Nat).
 
