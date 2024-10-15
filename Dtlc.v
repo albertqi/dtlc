@@ -244,3 +244,46 @@ Example assoc2 :
   eval_fuel 200 (App (App mult (nat_to_term 4)) (App (App mult (nat_to_term 5)) (nat_to_term 6))).
 
 Proof. reflexivity. Qed.
+
+(* Power Function *)
+Definition pow : term :=
+  Fun Nat (Fun Nat (ElimNat (Fun Nat Nat) (Succ Zero) (Fun Nat (Fun Nat (App (App mult (Var 3)) (Var 0)))) (Var 0))).
+
+Example pow1 :
+  eval_fuel 10 (App (App pow (nat_to_term 5)) Zero) = Succ Zero.
+
+Proof. simpl. reflexivity. Qed.
+
+Example pow2 :
+  eval_fuel 10 (App (App pow Zero) (nat_to_term 5)) = Zero.
+
+Proof. simpl. reflexivity. Qed.
+
+Example pow3 :
+  eval_fuel 10 (App (App pow Zero) Zero) = Succ Zero.
+
+Proof. simpl. reflexivity. Qed.
+
+Example pow4 :
+  eval_fuel 100 (App (App pow (nat_to_term 5)) (nat_to_term 2)) = nat_to_term 25.
+
+Proof. reflexivity. Qed.
+
+Example pow5 :
+  eval_fuel 100 (App (App pow (nat_to_term 2)) (nat_to_term 5)) = nat_to_term 32.
+
+Proof. reflexivity. Qed.
+
+(* Factorial Function *)
+Definition fact : term :=
+  Fun Nat (ElimNat (Fun Nat Nat) (Succ Zero) (Fun Nat (Fun Nat (App (App mult (Succ (Var 1))) (Var 0)))) (Var 0)).
+
+Example fact1 :
+  eval_fuel 10 (App fact Zero) = Succ Zero.
+
+Proof. simpl. reflexivity. Qed.
+
+Example fact2 :
+  eval_fuel 200 (App fact (nat_to_term 5)) = nat_to_term 120.
+
+Proof. reflexivity. Qed.
